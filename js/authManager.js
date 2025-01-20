@@ -11,10 +11,11 @@ export class AuthManager {
 
   setupDefaultAdmin() {
     const adminUser = {
-      username: 'DonoIPTVisionK',
+      username: 'kaua23193',
       password: 'kaua20126',
       isAdmin: true,
-      duration: 'infinite'
+      duration: 'infinite',
+      createdAt: Date.now()
     };
     
     if (!this.users.find(u => u.username === adminUser.username)) {
@@ -120,8 +121,8 @@ export class AuthManager {
   deleteUser(username) {
     if (!this.isAdmin()) return false;
     
-    // Prevent deleting the admin account
-    if (username === 'DonoIPTVisionK') return false;
+    // Prevent deleting the owner account
+    if (username === 'kaua23193') return false;
     
     this.users = this.users.filter(u => u.username !== username);
     this.saveUsers();
@@ -135,6 +136,21 @@ export class AuthManager {
       user.username.toLowerCase().includes(query.toLowerCase()) ||
       (user.duration + '').toLowerCase().includes(query.toLowerCase())
     );
+  }
+
+  toggleUserType(username) {
+    if (!this.isAdmin()) return false;
+    
+    // Prevent modifying the owner account
+    if (username === 'kaua23193') return false;
+    
+    const user = this.users.find(u => u.username === username);
+    if (user) {
+      user.isAdmin = !user.isAdmin;
+      this.saveUsers();
+      return true;
+    }
+    return false;
   }
 
   verifyAdminPassword(password) {

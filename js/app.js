@@ -11,6 +11,7 @@ class App {
     this.authManager = new AuthManager();
     this.adminVerified = false;
     
+    this.initializeDeviceSupport();
     this.init();
   }
 
@@ -22,6 +23,12 @@ class App {
       // Check if user is already logged in
       if (this.authManager.checkLoggedIn()) {
         this.showMainContent();
+        
+        // Load saved playlist when initializing
+        const savedPlaylist = localStorage.getItem('iptvision_playlist');
+        if (savedPlaylist) {
+          await this.loadPlaylist(savedPlaylist);
+        }
       }
     } catch (error) {
       console.error('Failed to initialize app:', error);
@@ -60,7 +67,6 @@ class App {
     document.getElementById('login-page').classList.remove('active');
     document.getElementById('main-page').classList.add('active');
     
-    // Show admin features if user is admin
     if (this.authManager.isAdmin()) {
       document.getElementById('admin-menu-btn').style.display = 'inline';
       document.getElementById('m3u-input').closest('.file-input-container').style.display = 'block';
@@ -68,7 +74,12 @@ class App {
       document.getElementById('admin-menu-btn').style.display = 'none';
       document.getElementById('m3u-input').closest('.file-input-container').style.display = 'none';
     }
-    this.setupFileInput();
+
+    // Load saved playlist when showing main content
+    const savedPlaylist = localStorage.getItem('iptvision_playlist');
+    if (savedPlaylist) {
+      this.loadPlaylist(savedPlaylist);
+    }
   }
 
   showAdminPanel() {
@@ -109,18 +120,27 @@ class App {
         'Sem expiração' : 
         this.formatExpiryTime(user.createdAt, user.duration);
       
+      const isOwner = user.username === 'DonoVisionPlayK';
+      
       return `
         <div class="user-item">
           <div class="user-info">
             <span class="user-name">${user.username}</span>
-            ${user.isAdmin ? '<span class="admin-badge">Admin</span>' : ''}
+            <button class="user-type-toggle ${user.isAdmin ? 'admin' : 'normal'}"
+                    ${isOwner ? 'disabled' : ''}
+                    data-username="${user.username}">
+              ${user.isAdmin ? 'Admin' : 'Normal'}
+            </button>
             <div class="user-details">
               <span class="user-password">Senha: ${user.password}</span>
               <span class="user-expiry">Expira: ${expiryTime}</span>
             </div>
           </div>
           <div class="user-actions">
-            ${!user.isAdmin ? `
+            <button class="login-as-user-btn" data-username="${user.username}" data-password="${user.password}">
+              Logar como usuário
+            </button>
+            ${!isOwner ? `
               <button class="delete-user-btn" data-username="${user.username}">
                 Deletar
               </button>
@@ -130,7 +150,18 @@ class App {
       `;
     }).join('');
 
-    // Add event listeners for delete buttons
+    // Add event listeners for login as user buttons
+    document.querySelectorAll('.login-as-user-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const username = e.target.dataset.username;
+        const password = e.target.dataset.password;
+        this.authManager.login(username, password);
+        this.showMainContent();
+        this.uiManager.showError(`Logado como ${username}`);
+      });
+    });
+
+    // Add event listeners for delete buttons and type toggle
     document.querySelectorAll('.delete-user-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const username = e.target.dataset.username;
@@ -138,6 +169,17 @@ class App {
           this.authManager.deleteUser(username);
           this.renderUsersList(searchQuery);
           this.uiManager.showError('Usuário deletado com sucesso');
+        }
+      });
+    });
+
+    // Add event listeners for user type toggle
+    document.querySelectorAll('.user-type-toggle').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const username = e.target.dataset.username;
+        if (this.authManager.toggleUserType(username)) {
+          this.renderUsersList(searchQuery);
+          this.uiManager.showError(`Tipo de usuário alterado com sucesso`);
         }
       });
     });
@@ -224,6 +266,29 @@ class App {
     } else {
       adminMenuBtn.style.display = 'none';
     }
+
+    // Add home button refresh functionality
+    document.querySelector('a[href="https://visionplay.com/home"]').addEventListener('click', (e) => {
+      e.preventDefault();
+      window.location.reload();
+    });
+
+    // Add double-tap support for mobile fullscreen
+    let lastTap = 0;
+    document.getElementById('video').addEventListener('touchend', (e) => {
+      const currentTime = new Date().getTime();
+      const tapLength = currentTime - lastTap;
+      
+      if (tapLength < 500 && tapLength > 0) {
+        // Double tap detected
+        if (document.fullscreenElement) {
+          document.exitFullscreen();
+        } else {
+          document.getElementById('video-player').requestFullscreen();
+        }
+      }
+      lastTap = currentTime;
+    });
   }
 
   setupFileInput() {
@@ -244,11 +309,10 @@ class App {
 
   async loadPlaylist(content) {
     try {
-      // Show loading state
       this.uiManager.showLoading();
       
       // Load and validate channels
-      await this.channelManager.loadChannels(content);
+      const channels = await this.channelManager.loadChannels(content);
       
       // Update categories
       const categories = this.channelManager.getCategories();
@@ -257,7 +321,6 @@ class App {
       // Render channel list
       this.uiManager.renderChannels(this.channelManager.getChannels());
       
-      // Hide loading state
       this.uiManager.hideLoading();
       
     } catch (error) {
@@ -279,6 +342,120 @@ class App {
       console.error('Error playing channel:', error);
       this.uiManager.showError('Erro ao reproduzir o canal. Por favor, tente outro canal.');
     }
+  }
+
+  initializeDeviceSupport() {
+    // Enable keyboard navigation for TV
+    if (this.isTV()) {
+      this.enableTVNavigation();
+    }
+
+    // Add touch support for mobile/tablet
+    if (this.isTouchDevice()) {
+      this.enableTouchSupport();
+    }
+
+    // Handle orientation changes
+    this.handleOrientationChange();
+  }
+
+  isTV() {
+    return window.matchMedia('(min-width: 1200px) and (min-height: 800px)').matches;
+  }
+
+  isTouchDevice() {
+    return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+  }
+
+  enableTVNavigation() {
+    document.addEventListener('keydown', (e) => {
+      const focusedElement = document.activeElement;
+      
+      switch(e.key) {
+        case 'ArrowRight':
+        case 'ArrowLeft':
+        case 'ArrowUp':
+        case 'ArrowDown':
+          this.handleTVNavigation(e.key);
+          break;
+        case 'Enter':
+          if (focusedElement.classList.contains('channel-card')) {
+            const channelId = focusedElement.dataset.channelId;
+            this.playChannel(channelId);
+          }
+          break;
+      }
+    });
+  }
+
+  handleTVNavigation(direction) {
+    const focusableElements = [
+      ...document.querySelectorAll('.channel-card, .category-btn, button, input')
+    ].filter(el => {
+      const style = window.getComputedStyle(el);
+      return style.display !== 'none' && style.visibility !== 'hidden';
+    });
+
+    const currentIndex = focusableElements.indexOf(document.activeElement);
+    let nextIndex;
+
+    switch(direction) {
+      case 'ArrowRight':
+        nextIndex = currentIndex + 1;
+        break;
+      case 'ArrowLeft':
+        nextIndex = currentIndex - 1;
+        break;
+      case 'ArrowUp':
+        nextIndex = currentIndex - Math.floor(window.innerWidth / 250); // Approximate items per row
+        break;
+      case 'ArrowDown':
+        nextIndex = currentIndex + Math.floor(window.innerWidth / 250);
+        break;
+    }
+
+    if (nextIndex >= 0 && nextIndex < focusableElements.length) {
+      focusableElements[nextIndex].focus();
+    }
+  }
+
+  enableTouchSupport() {
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    document.addEventListener('touchstart', (e) => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+      const touchEndX = e.changedTouches[0].clientX;
+      const touchEndY = e.changedTouches[0].clientY;
+      const deltaX = touchEndX - touchStartX;
+      const deltaY = touchEndY - touchStartY;
+
+      // Detect swipe
+      if (Math.abs(deltaX) > 50 || Math.abs(deltaY) > 50) {
+        this.handleSwipe(deltaX, deltaY);
+      }
+    }, { passive: true });
+  }
+
+  handleSwipe(deltaX, deltaY) {
+    // Add swipe gesture handling if needed
+    // For example, swiping between categories or channels
+  }
+
+  handleOrientationChange() {
+    window.addEventListener('orientationchange', () => {
+      // Adjust layout after orientation change
+      setTimeout(() => {
+        const video = document.getElementById('video');
+        if (video && !video.paused) {
+          video.play();
+        }
+      }, 100);
+    });
   }
 }
 

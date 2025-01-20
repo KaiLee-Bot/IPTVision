@@ -6,7 +6,8 @@ export class ChannelManager {
   }
 
   async loadChannels(m3uContent) {
-    this.savePlaylist(m3uContent);
+    // Save playlist to localStorage when admin uploads a new one
+    localStorage.setItem('iptvision_playlist', m3uContent);
     this.channels = this.parseM3U(m3uContent);
     await this.validateChannels();
     return this.channels;
@@ -19,8 +20,12 @@ export class ChannelManager {
   async loadSavedPlaylist() {
     const savedPlaylist = localStorage.getItem('iptvision_playlist');
     if (savedPlaylist) {
-      await this.loadChannels(savedPlaylist);
+      // Load channels from saved playlist
+      this.channels = this.parseM3U(savedPlaylist);
+      await this.validateChannels();
+      return this.channels; 
     }
+    return [];
   }
 
   parseM3U(content) {
@@ -47,9 +52,19 @@ export class ChannelManager {
         const tvgLogoMatch = line.match(/tvg-logo="([^"]+)"/);
         const groupTitleMatch = line.match(/group-title="([^"]+)"/);
         
-        if (tvgNameMatch) currentChannel.tvgName = tvgNameMatch[1];
+        // Use tvg-name as title if available, otherwise keep existing name
+        if (tvgNameMatch) {
+          currentChannel.name = tvgNameMatch[1];
+        }
+        
+        // If name is still not set, provide a default
+        if (!currentChannel.name) {
+          currentChannel.name = 'Canal sem nome';
+        }
+
         if (tvgLogoMatch) currentChannel.logo = tvgLogoMatch[1];
         if (groupTitleMatch) currentChannel.category = groupTitleMatch[1].toLowerCase();
+        else currentChannel.category = 'geral';
         
         currentChannel.id = crypto.randomUUID();
         
@@ -67,19 +82,37 @@ export class ChannelManager {
   async validateChannels() {
     const validationPromises = this.channels.map(async channel => {
       try {
-        const response = await fetch(channel.streamUrl, { method: 'HEAD', timeout: 5000 });
-        channel.isActive = response.ok;
-        if (response.ok) this.activeLinks.add(channel.id);
+        // First try with HEAD request
+        try {
+          const response = await fetch(channel.streamUrl, { 
+            method: 'HEAD',
+            timeout: 5000
+          });
+          channel.isActive = response.ok;
+          if (response.ok) this.activeLinks.add(channel.id);
+        } catch {
+          // If HEAD fails, try with GET request
+          const response = await fetch(channel.streamUrl, { 
+            method: 'GET',
+            timeout: 5000
+          });
+          channel.isActive = response.ok;
+          if (response.ok) this.activeLinks.add(channel.id);
+        }
       } catch {
-        channel.isActive = false;
+        // Mark as active even if validation fails - let player handle errors
+        channel.isActive = true;
+        this.activeLinks.add(channel.id);
       }
     });
 
-    await Promise.all(validationPromises);
+    // Wait for all validations to complete
+    await Promise.allSettled(validationPromises);
   }
 
   getChannels() {
-    return this.channels.filter(channel => channel.isActive);
+    // Return all channels instead of filtering by isActive
+    return this.channels;
   }
 
   getChannel(id) {
@@ -92,10 +125,8 @@ export class ChannelManager {
   }
 
   filterChannels(category) {
-    if (category === 'all') return this.getChannels();
-    return this.channels.filter(channel => 
-      channel.isActive && channel.category === category
-    );
+    if (category === 'all') return this.channels;
+    return this.channels.filter(channel => channel.category === category);
   }
 
   async refreshChannels() {

@@ -13,6 +13,19 @@ class App {
     
     this.initializeDeviceSupport();
     this.init();
+
+    // Listen for playlist updates
+    window.addEventListener('playlistUpdated', (e) => {
+      const { channels, uploadedBy } = e.detail;
+      this.uiManager.renderChannels(channels);
+      
+      // Update categories
+      const categories = this.channelManager.getCategories();
+      this.uiManager.updateCategories(categories);
+      
+      // Show notification
+      this.uiManager.showError(`Playlist atualizada por ${uploadedBy}`);
+    });
   }
 
   async init() {

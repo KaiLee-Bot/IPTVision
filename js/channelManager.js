@@ -3,29 +3,72 @@ export class ChannelManager {
     this.channels = [];
     this.activeLinks = new Set();
     this.loadSavedPlaylist();
+    
+    // Add playlist update check interval
+    setInterval(() => this.checkForPlaylistUpdates(), 10000); // Check every 10 seconds
   }
 
   async loadChannels(m3uContent) {
-    // Save playlist to localStorage when admin uploads a new one
-    localStorage.setItem('iptvision_playlist', m3uContent);
+    // Save playlist to localStorage with timestamp
+    const playlistData = {
+      content: m3uContent,
+      timestamp: Date.now(),
+      uploadedBy: JSON.parse(localStorage.getItem('iptvision_current_user'))?.username
+    };
+    
+    localStorage.setItem('global_playlist', JSON.stringify(playlistData));
+    
     this.channels = this.parseM3U(m3uContent);
     await this.validateChannels();
     return this.channels;
   }
 
-  savePlaylist(m3uContent) {
-    localStorage.setItem('iptvision_playlist', m3uContent);
-  }
-
   async loadSavedPlaylist() {
-    const savedPlaylist = localStorage.getItem('iptvision_playlist');
-    if (savedPlaylist) {
+    const savedPlaylistData = localStorage.getItem('global_playlist');
+    if (savedPlaylistData) {
+      const playlistData = JSON.parse(savedPlaylistData);
       // Load channels from saved playlist
-      this.channels = this.parseM3U(savedPlaylist);
+      this.channels = this.parseM3U(playlistData.content);
       await this.validateChannels();
       return this.channels; 
     }
     return [];
+  }
+
+  // Check for playlist updates from other admins
+  async checkForPlaylistUpdates() {
+    const currentData = localStorage.getItem('global_playlist');
+    if (!currentData) return;
+
+    const currentPlaylist = JSON.parse(currentData);
+    const lastUpdateTime = currentPlaylist.timestamp;
+
+    try {
+      // In a real implementation, this would be an API call to your server
+      // For now, we'll simulate by checking localStorage
+      const latestData = localStorage.getItem('global_playlist');
+      if (!latestData) return;
+
+      const latestPlaylist = JSON.parse(latestData);
+      
+      // If there's a newer playlist available
+      if (latestPlaylist.timestamp > lastUpdateTime) {
+        console.log('New playlist detected, updating...');
+        this.channels = this.parseM3U(latestPlaylist.content);
+        await this.validateChannels();
+        
+        // Trigger UI update
+        const event = new CustomEvent('playlistUpdated', {
+          detail: {
+            channels: this.channels,
+            uploadedBy: latestPlaylist.uploadedBy
+          }
+        });
+        window.dispatchEvent(event);
+      }
+    } catch (error) {
+      console.error('Error checking for playlist updates:', error);
+    }
   }
 
   parseM3U(content) {

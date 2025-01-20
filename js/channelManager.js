@@ -2,7 +2,24 @@ export class ChannelManager {
   constructor() {
     this.channels = [];
     this.activeLinks = new Set();
+    this.room = new WebsimSocket();
+    this.setupPlaylistSync();
     this.loadSavedPlaylist();
+  }
+
+  setupPlaylistSync() {
+    // Subscribe to playlist changes
+    this.room.collection('playlist').subscribe((playlists) => {
+      if (playlists && playlists.length > 0) {
+        // Get most recent playlist
+        const latestPlaylist = playlists[0];
+        if (latestPlaylist && latestPlaylist.content) {
+          // Parse and load the channels without saving to localStorage
+          this.channels = this.parseM3U(latestPlaylist.content);
+          this.validateChannels();
+        }
+      }
+    });
   }
 
   async loadChannels(m3uContent) {
@@ -11,11 +28,20 @@ export class ChannelManager {
       this.channels = this.parseM3U(m3uContent);
       await this.validateChannels();
 
-      // Store in localStorage 
-      localStorage.setItem('global_playlist', JSON.stringify({
-        content: m3uContent,
-        updatedAt: Date.now()
-      }));
+      // If user is admin, publish playlist to all users
+      if (window.app.authManager.isAdmin()) {
+        // Delete old playlists
+        const existingPlaylists = await this.room.collection('playlist').getList();
+        for (const playlist of existingPlaylists) {
+          await this.room.collection('playlist').delete(playlist.id);
+        }
+
+        // Create new playlist record
+        await this.room.collection('playlist').create({
+          content: m3uContent,
+          timestamp: Date.now()
+        });
+      }
 
       return this.channels;
     } catch (error) {
@@ -26,10 +52,11 @@ export class ChannelManager {
 
   async loadSavedPlaylist() {
     try {
-      const savedPlaylistData = localStorage.getItem('global_playlist');
-      if (savedPlaylistData) {
-        const playlistData = JSON.parse(savedPlaylistData);
-        this.channels = this.parseM3U(playlistData.content);
+      // Get playlists from WebsimSocket instead of localStorage
+      const playlists = await this.room.collection('playlist').getList();
+      if (playlists && playlists.length > 0) {
+        const latestPlaylist = playlists[0];
+        this.channels = this.parseM3U(latestPlaylist.content);
         await this.validateChannels();
         return this.channels;
       }

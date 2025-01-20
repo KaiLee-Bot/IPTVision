@@ -305,6 +305,40 @@ export class App {
       }
       lastTap = currentTime;
     });
+
+    // Add publish button handler
+    document.getElementById('publish-playlist-btn').addEventListener('click', () => {
+      if (this.authManager.isAdmin()) {
+        this.channelManager.publishPlaylistToAllUsers();
+        this.uiManager.showError('Playlist publicada para todos os usuários!');
+      }
+    });
+
+    // Add touch support for mobile/tablet
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    document.addEventListener('touchstart', (e) => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+      const touchEndX = e.changedTouches[0].clientX;
+      const touchEndY = e.changedTouches[0].clientY;
+      const deltaX = touchEndX - touchStartX;
+      const deltaY = touchEndY - touchStartY;
+
+      // Detect swipe
+      if (Math.abs(deltaX) > 50 || Math.abs(deltaY) > 50) {
+        this.handleSwipe(deltaX, deltaY);
+      }
+    }, { passive: true });
+  }
+
+  handleSwipe(deltaX, deltaY) {
+    // Add swipe gesture handling if needed
+    // For example, swiping between categories or channels
   }
 
   setupFileInput() {
@@ -455,11 +489,6 @@ export class App {
         this.handleSwipe(deltaX, deltaY);
       }
     }, { passive: true });
-  }
-
-  handleSwipe(deltaX, deltaY) {
-    // Add swipe gesture handling if needed
-    // For example, swiping between categories or channels
   }
 
   handleOrientationChange() {

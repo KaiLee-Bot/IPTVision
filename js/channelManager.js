@@ -2,46 +2,21 @@ export class ChannelManager {
   constructor() {
     this.channels = [];
     this.activeLinks = new Set();
-    this.room = new WebsimSocket();
-    this.setupPlaylistSync();
-    this.loadSavedPlaylist();
-  }
-
-  setupPlaylistSync() {
-    // Subscribe to playlist changes
-    this.room.collection('playlist').subscribe((playlists) => {
-      if (playlists && playlists.length > 0) {
-        // Get most recent playlist
-        const latestPlaylist = playlists[0];
-        if (latestPlaylist && latestPlaylist.content) {
-          // Parse and load the channels without saving to localStorage
-          this.channels = this.parseM3U(latestPlaylist.content);
-          this.validateChannels();
-        }
-      }
-    });
   }
 
   async loadChannels(m3uContent) {
     try {
-      // Parse and validate channels
+      // Parse channels without validation first for immediate display
       this.channels = this.parseM3U(m3uContent);
-      await this.validateChannels();
+      
+      // Save to localStorage for global access
+      localStorage.setItem('global_playlist', JSON.stringify({
+        content: m3uContent,
+        timestamp: Date.now()
+      }));
 
-      // If user is admin, publish playlist to all users
-      if (window.app.authManager.isAdmin()) {
-        // Delete old playlists
-        const existingPlaylists = await this.room.collection('playlist').getList();
-        for (const playlist of existingPlaylists) {
-          await this.room.collection('playlist').delete(playlist.id);
-        }
-
-        // Create new playlist record
-        await this.room.collection('playlist').create({
-          content: m3uContent,
-          timestamp: Date.now()
-        });
-      }
+      // Start validation in background
+      this.validateChannelsInBackground();
 
       return this.channels;
     } catch (error) {
@@ -50,20 +25,34 @@ export class ChannelManager {
     }
   }
 
-  async loadSavedPlaylist() {
-    try {
-      // Get playlists from WebsimSocket instead of localStorage
-      const playlists = await this.room.collection('playlist').getList();
-      if (playlists && playlists.length > 0) {
-        const latestPlaylist = playlists[0];
-        this.channels = this.parseM3U(latestPlaylist.content);
-        await this.validateChannels();
-        return this.channels;
-      }
-    } catch (error) {
-      console.error('Error loading saved playlist:', error);
+  async validateChannelsInBackground() {
+    // Validate in batches of 10 channels
+    const batchSize = 10;
+    for (let i = 0; i < this.channels.length; i += batchSize) {
+      const batch = this.channels.slice(i, i + batchSize);
+      const validationPromises = batch.map(async channel => {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+          
+          const response = await fetch(channel.streamUrl, { 
+            method: 'HEAD',
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+          channel.isActive = response.ok;
+          if (response.ok) this.activeLinks.add(channel.id);
+        } catch {
+          // Mark as active by default - let player handle errors
+          channel.isActive = true;
+          this.activeLinks.add(channel.id);
+        }
+      });
+
+      // Wait for current batch to complete before moving to next
+      await Promise.allSettled(validationPromises);
     }
-    return [];
   }
 
   parseM3U(content) {
@@ -75,27 +64,22 @@ export class ChannelManager {
       line = line.trim();
       
       if (line.startsWith('#EXTINF:')) {
-        // Parse channel info
         currentChannel = {};
         
-        // Extract duration and channel name
         const match = line.match(/#EXTINF:(-?\d+)\s*,\s*(.+)/);
         if (match) {
           currentChannel.duration = parseInt(match[1]);
           currentChannel.name = match[2];
         }
         
-        // Extract additional attributes if present
         const tvgNameMatch = line.match(/tvg-name="([^"]+)"/);
         const tvgLogoMatch = line.match(/tvg-logo="([^"]+)"/);
         const groupTitleMatch = line.match(/group-title="([^"]+)"/);
         
-        // Use tvg-name as title if available, otherwise keep existing name
         if (tvgNameMatch) {
           currentChannel.name = tvgNameMatch[1];
         }
         
-        // If name is still not set, provide a default using the raw name
         if (!currentChannel.name || currentChannel.name === 'undefined') {
           const rawName = match ? match[2] : 'Canal sem nome';
           currentChannel.name = rawName;
@@ -108,8 +92,9 @@ export class ChannelManager {
         currentChannel.id = crypto.randomUUID();
         
       } else if (line && !line.startsWith('#') && currentChannel) {
-        // This is the URL line
         currentChannel.streamUrl = line;
+        // Mark all channels as active by default
+        currentChannel.isActive = true;
         channels.push(currentChannel);
         currentChannel = null;
       }
@@ -118,39 +103,7 @@ export class ChannelManager {
     return channels;
   }
 
-  async validateChannels() {
-    const validationPromises = this.channels.map(async channel => {
-      try {
-        // First try with HEAD request
-        try {
-          const response = await fetch(channel.streamUrl, { 
-            method: 'HEAD',
-            timeout: 5000
-          });
-          channel.isActive = response.ok;
-          if (response.ok) this.activeLinks.add(channel.id);
-        } catch {
-          // If HEAD fails, try with GET request
-          const response = await fetch(channel.streamUrl, { 
-            method: 'GET',
-            timeout: 5000
-          });
-          channel.isActive = response.ok;
-          if (response.ok) this.activeLinks.add(channel.id);
-        }
-      } catch {
-        // Mark as active even if validation fails - let player handle errors
-        channel.isActive = true;
-        this.activeLinks.add(channel.id);
-      }
-    });
-
-    // Wait for all validations to complete
-    await Promise.allSettled(validationPromises);
-  }
-
   getChannels() {
-    // Return all channels instead of filtering by isActive
     return this.channels;
   }
 
@@ -168,8 +121,13 @@ export class ChannelManager {
     return this.channels.filter(channel => channel.category === category);
   }
 
-  async refreshChannels() {
-    await this.validateChannels();
-    return this.getChannels();
+  publishPlaylistToAllUsers() {
+    const currentPlaylist = localStorage.getItem('global_playlist');
+    if (currentPlaylist) {
+      // Update timestamp to force refresh on other clients
+      const updatedPlaylist = JSON.parse(currentPlaylist);
+      updatedPlaylist.timestamp = Date.now();
+      localStorage.setItem('global_playlist', JSON.stringify(updatedPlaylist));
+    }
   }
 }

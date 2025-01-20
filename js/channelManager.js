@@ -2,6 +2,10 @@ export class ChannelManager {
   constructor() {
     this.channels = [];
     this.activeLinks = new Set();
+    this.validation = {
+      inProgress: false,
+      lastCheck: null
+    };
   }
 
   async loadChannels(m3uContent) {
@@ -10,13 +14,16 @@ export class ChannelManager {
       this.channels = this.parseM3U(m3uContent);
       
       // Save to localStorage for global access
-      localStorage.setItem('global_playlist', JSON.stringify({
+      const playlistData = {
         content: m3uContent,
         timestamp: Date.now()
-      }));
+      };
+      localStorage.setItem('global_playlist', JSON.stringify(playlistData));
 
-      // Start validation in background
-      this.validateChannelsInBackground();
+      // Start validation in background if not already running
+      if (!this.validation.inProgress) {
+        this.validateChannelsInBackground();
+      }
 
       return this.channels;
     } catch (error) {
@@ -26,32 +33,52 @@ export class ChannelManager {
   }
 
   async validateChannelsInBackground() {
-    // Validate in batches of 10 channels
-    const batchSize = 10;
-    for (let i = 0; i < this.channels.length; i += batchSize) {
-      const batch = this.channels.slice(i, i + batchSize);
-      const validationPromises = batch.map(async channel => {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
-          
-          const response = await fetch(channel.streamUrl, { 
-            method: 'HEAD',
-            signal: controller.signal
-          });
-          
-          clearTimeout(timeoutId);
-          channel.isActive = response.ok;
-          if (response.ok) this.activeLinks.add(channel.id);
-        } catch {
-          // Mark as active by default - let player handle errors
-          channel.isActive = true;
-          this.activeLinks.add(channel.id);
-        }
-      });
+    if (this.validation.inProgress) return;
+    
+    this.validation.inProgress = true;
+    const now = Date.now();
+    
+    // Skip validation if last check was less than 15 minutes ago
+    if (this.validation.lastCheck && (now - this.validation.lastCheck < 900000)) {
+      this.validation.inProgress = false;
+      return;
+    }
 
-      // Wait for current batch to complete before moving to next
-      await Promise.allSettled(validationPromises);
+    try {
+      // Process in smaller batches
+      const batchSize = 5;
+      for (let i = 0; i < this.channels.length; i += batchSize) {
+        const batch = this.channels.slice(i, i + batchSize);
+        await Promise.all(batch.map(this.validateChannel.bind(this)));
+        
+        // Brief pause between batches to prevent overwhelming
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    } catch (error) {
+      console.error('Channel validation error:', error);
+    } finally {
+      this.validation.inProgress = false;
+      this.validation.lastCheck = now;
+    }
+  }
+
+  async validateChannel(channel) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+      const response = await fetch(channel.streamUrl, { 
+        method: 'HEAD',
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      channel.isActive = response.ok;
+      if (response.ok) this.activeLinks.add(channel.id);
+    } catch {
+      // Mark as active by default - let player handle errors
+      channel.isActive = true;
+      this.activeLinks.add(channel.id);
     }
   }
 

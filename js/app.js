@@ -385,11 +385,18 @@ export class App {
       const channel = this.channelManager.getChannel(channelId);
       if (!channel) throw new Error('Canal não encontrado');
 
+      console.log('Playing channel:', channel); // Debug log
+      
+      this.uiManager.showLoading();
       this.uiManager.updateChannelInfo(channel);
+      
       await this.player.play(channel.streamUrl);
+      
+      this.uiManager.hideLoading();
       
     } catch (error) {
       console.error('Error playing channel:', error);
+      this.uiManager.hideLoading();
       this.uiManager.showError('Erro ao reproduzir o canal. Por favor, tente outro canal.');
     }
   }

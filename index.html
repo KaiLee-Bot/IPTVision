@@ -4,9 +4,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VisionPlay - Streaming de TV Online</title>
   <link rel="stylesheet" href="css/style.css">
+  <!-- Make sure WebsimSocket is loaded first -->
   <script src="https://websim.ai/websim.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-  <script type="module" src="js/app.js"></script>
+  <!-- Add defer to ensure DOM is loaded -->
+  <script type="module" src="js/app.js" defer></script>
 </head>
 <body>
   <div id="login-page" class="page active">

@@ -2,12 +2,20 @@ export class ChannelManager {
   constructor() {
     this.channels = [];
     this.activeLinks = new Set();
+    // Ensure WebsimSocket is available
+    if (typeof WebsimSocket === 'undefined') {
+      console.error('WebsimSocket not loaded. Please check script loading order.');
+      return;
+    }
     this.room = new WebsimSocket();
     this.setupRealtime();
     this.loadSavedPlaylist();
   }
 
   setupRealtime() {
+    // Only setup if WebsimSocket is available
+    if (!this.room) return;
+
     // Listen for playlist updates from other admins
     this.room.onmessage = (event) => {
       const data = event.data;

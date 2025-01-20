@@ -1,0 +1,515 @@
+:root {
+  --primary-color: #1a73e8;
+  --background-color: #121212;
+  --surface-color: #1e1e1e;
+  --text-color: #ffffff;
+  --text-secondary: #b3b3b3;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  line-height: 1.6;
+}
+
+/* Header Styles */
+header {
+  background-color: var(--surface-color);
+  padding: 1rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+nav {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.nav-links a {
+  color: var(--text-color);
+  text-decoration: none;
+  margin-left: 2rem;
+  transition: color 0.3s ease;
+}
+
+.nav-links a:hover {
+  color: var(--primary-color);
+}
+
+/* Main Content */
+main {
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+/* Player Section */
+.player-section {
+  margin-bottom: 2rem;
+}
+
+#video-player {
+  background-color: var(--surface-color);
+  border-radius: 8px;
+  overflow: hidden;
+  aspect-ratio: 16/9;
+}
+
+#video {
+  width: 100%;
+  height: 100%;
+}
+
+.channel-info {
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: var(--surface-color);
+  border-radius: 8px;
+}
+
+/* Channels Grid */
+.channels-grid {
+  background-color: var(--surface-color);
+  padding: 1.5rem;
+  border-radius: 8px;
+}
+
+.categories {
+  margin-bottom: 1.5rem;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.category-btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 20px;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.category-btn.active,
+.category-btn:hover {
+  background-color: var(--primary-color);
+}
+
+#channels-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.channel-card {
+  background-color: var(--background-color);
+  border-radius: 8px;
+  padding: 1rem;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.channel-card:hover {
+  transform: translateY(-5px);
+}
+
+.channel-logo-container {
+  width: 100%;
+  height: 100px;
+  background-color: var(--surface-color);
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+
+.channel-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.channel-logo-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.channel-name {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.channel-category {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* Footer */
+footer {
+  text-align: center;
+  padding: 2rem;
+  background-color: var(--surface-color);
+  margin-top: 2rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .nav-links {
+    display: none;
+  }
+  
+  .channels-grid {
+    padding: 1rem;
+  }
+  
+  .category-btn {
+    font-size: 0.9rem;
+  }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.channel-card {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Loading Overlay */
+#loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid var(--text-secondary);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* File Input */
+.file-input-container {
+  text-align: center;
+  padding: 2rem;
+  background-color: var(--surface-color);
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+
+.file-input-label {
+  display: inline-block;
+  padding: 0.8rem 1.5rem;
+  background-color: var(--primary-color);
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.file-input-label:hover {
+  background-color: #1557b0;
+}
+
+#m3u-input {
+  display: none;
+}
+
+.no-channels {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+}
+
+/* New styles for login and admin features */
+.page {
+  display: none;
+}
+
+.page.active {
+  display: block;
+}
+
+.login-container {
+  max-width: 400px;
+  margin: 100px auto;
+  padding: 2rem;
+  background-color: var(--surface-color);
+  border-radius: 8px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 0.8rem;
+  border: none;
+  border-radius: 4px;
+  background-color: var(--background-color);
+  color: var(--text-color);
+}
+
+.login-container button {
+  width: 100%;
+  padding: 0.8rem;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.login-container button:hover {
+  background-color: #1557b0;
+}
+
+/* Admin Panel Styles */
+.admin-panel {
+  background-color: var(--surface-color);
+  padding: 2rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+
+.admin-container h2 {
+  margin-bottom: 1.5rem;
+}
+
+.admin-container h3 {
+  margin: 1rem 0;
+}
+
+.user-manager {
+  margin-top: 2rem;
+}
+
+.search-container {
+  margin-bottom: 1rem;
+}
+
+.search-container input {
+  width: 100%;
+  padding: 0.8rem;
+  border: none;
+  border-radius: 4px;
+  background-color: var(--background-color);
+  color: var(--text-color);
+}
+
+.users-list {
+  background-color: var(--background-color);
+  border-radius: 4px;
+  padding: 1rem;
+  margin-top: 1rem;
+}
+
+.user-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.8rem;
+  border-bottom: 1px solid var(--surface-color);
+}
+
+.user-item:last-child {
+  border-bottom: none;
+}
+
+.admin-btn {
+  padding: 0.8rem 1.5rem;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.admin-btn:hover {
+  background-color: #1557b0;
+}
+
+/* Modal Styles */
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  z-index: 1001;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background-color: var(--surface-color);
+  padding: 2rem;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 500px;
+}
+
+.button-group {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.button-group button {
+  flex: 1;
+  padding: 0.8rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.button-group button[type="submit"] {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.button-group button[type="button"] {
+  background-color: var(--background-color);
+  color: var(--text-color);
+}
+
+.user-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background-color: var(--background-color);
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.admin-badge {
+  background-color: var(--primary-color);
+  color: white;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+}
+
+.user-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.delete-user-btn {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.delete-user-btn:hover {
+  background-color: #c82333;
+}
+
+#admin-menu-btn {
+  cursor: pointer;
+}
+
+.admin-panel {
+  margin-top: 2rem;
+  animation: fadeIn 0.3s ease-out;
+}
+
+#create-user-modal {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Error notification enhancement */
+.error-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 1rem;
+  background-color: var(--surface-color);
+  color: var(--text-color);
+  border-radius: 4px;
+  z-index: 1000;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.user-details {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-top: 0.5rem;
+}
+
+.user-password {
+  margin-right: 1rem;
+}
+
+.user-expiry {
+  color: #dc3545;
+}
